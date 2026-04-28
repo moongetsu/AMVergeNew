@@ -83,6 +83,7 @@ export default function HomePage({
         setSelectedClips={setSelectedClips}
         onImport={onImportClick}
         loading={loading}
+        clips={clips}
       />
 
       <div className="main-layout-wrapper" ref={mainLayoutWrapperRef}>

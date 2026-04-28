@@ -137,6 +137,14 @@
     transform: rotate(45deg) translateY(-1px) translateX(-1px);
 }
 
+.custom-checkbox input:checked + .checkmark.partial::after {
+    width: 12px;
+    height: 2px;
+    background: var(--accent);
+    border: none;
+    transform: none;
+}
+
 .zoomWrapper {
     display: flex;
     align-items: center;
