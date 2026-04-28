@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Event, listen } from "@tauri-apps/api/event";
+import { save } from "@tauri-apps/plugin-dialog";
 import { 
   applyThemeSettings, 
   loadThemeSettings, 
@@ -324,6 +325,22 @@ function App() {
     }
   }, [abortedRef]);
 
+  const handleDownloadClip = useCallback(async (clipId: string, clipSrc: string) => {
+    try {
+      const fileName = clipSrc.split(/[/\\]/).pop() || "clip.mp4";
+      const filePath = await save({
+        filters: [{ name: "Video", extensions: ["mp4", "mkv", "mov", "avi"] }],
+        defaultPath: fileName,
+      });
+
+      if (filePath) {
+        await invoke("copy_file", { source: clipSrc, destination: filePath });
+      }
+    } catch (err) {
+      console.error("Failed to download clip:", err);
+    }
+  }, []);
+
   // App-level hooks
   useHEVCSupport(userHasHEVC);
 
@@ -522,6 +539,7 @@ function App() {
             importedVideoPath={state.importedVideoPath}
             generalSettings={generalSettings}
             setGeneralSettings={setGeneralSettings}
+            onDownloadClip={handleDownloadClip}
           />
         ) : activePage === "menu" ? (
           <Menu />

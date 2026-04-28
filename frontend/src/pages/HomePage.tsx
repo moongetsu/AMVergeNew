@@ -37,6 +37,7 @@ interface HomePageProps {
   importedVideoPath: string | null;
   generalSettings: GeneralSettings;
   setGeneralSettings: React.Dispatch<React.SetStateAction<GeneralSettings>>;
+  onDownloadClip: (clipId: string, clipSrc: string) => void;
 }
 
 export default function HomePage({
@@ -69,6 +70,7 @@ export default function HomePage({
   importedVideoPath,
   generalSettings,
   setGeneralSettings,
+  onDownloadClip,
 }: HomePageProps) {
   return (
     <>
@@ -111,6 +113,7 @@ export default function HomePage({
           loading={loading}
           generalSettings={generalSettings}
           setGeneralSettings={setGeneralSettings}
+          onDownloadClip={onDownloadClip}
         />
 
         <div className="info-bar">

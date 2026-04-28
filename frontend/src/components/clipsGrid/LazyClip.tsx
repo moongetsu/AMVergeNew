@@ -7,6 +7,7 @@
 import { memo, useState, useRef, useEffect, useCallback } from "react"
 import { invoke } from "@tauri-apps/api/core";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { FiDownload } from "react-icons/fi";
 import { LazyClipProps } from "./types.ts"
 
 
@@ -27,6 +28,7 @@ export const LazyClip = memo(function LazyClip({
   userHasHEVC,
   audioPlaybackHover,
   hoverVolume,
+  onDownloadClip,
 }: LazyClipProps) {
   // state and refs for tile visibility, hover, video element, and proxy state
   const [isVisible, setIsVisible] = useState(false);
@@ -429,6 +431,17 @@ export const LazyClip = memo(function LazyClip({
       ) : (
         <div className="clip clip-skeleton" style={{ borderRadius: 15 }} />
       )}
+
+      <button 
+        className="clip-download-btn"
+        title="Download this clip"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDownloadClip(clip.id, clip.src);
+        }}
+      >
+        <FiDownload />
+      </button>
     </div>
   );
 });

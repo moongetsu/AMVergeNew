@@ -704,3 +704,17 @@ pub async fn export_clips(
 
     Ok(())
 }
+
+#[tauri::command]
+pub async fn copy_file(source: String, destination: String) -> Result<(), String> {
+    let src = Path::new(&source);
+    let dest = Path::new(&destination);
+
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    std::fs::copy(src, dest)
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}

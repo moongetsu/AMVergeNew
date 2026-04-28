@@ -33,6 +33,7 @@ type LayoutProps = {
     defaultMergedName: string;
     generalSettings: GeneralSettings;
     setGeneralSettings: React.Dispatch<React.SetStateAction<GeneralSettings>>;
+    onDownloadClip: (clipId: string, clipSrc: string) => void;
 };
 
 export default function MainLayout(props: LayoutProps) {
@@ -105,6 +106,7 @@ export default function MainLayout(props: LayoutProps) {
                     focusedClip={props.focusedClip}
                     audioPlaybackHover={props.generalSettings.audioPlaybackHover}
                     hoverVolume={props.generalSettings.hoverVolume}
+                    onDownloadClip={props.onDownloadClip}
                  />
             </div>
             

@@ -15,6 +15,7 @@ export type ClipContainerProps = {
   focusedClip: string | null;
   audioPlaybackHover: boolean;
   hoverVolume: number;
+  onDownloadClip: (clipId: string, clipSrc: string) => void;
 };
 
 export type DeferredProxy = {
@@ -56,4 +57,5 @@ export type LazyClipProps = {
   userHasHEVC: React.RefObject<boolean>;
   audioPlaybackHover: boolean;
   hoverVolume: number;
+  onDownloadClip: (clipId: string, clipSrc: string) => void;
 };
