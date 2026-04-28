@@ -1,6 +1,5 @@
-import { EpisodeEntry, EpisodeFolder } from "../types/domain";
-import { startTransition }  from "react";
-import { ClipItem } from "../types/domain"
+import { EpisodeEntry, EpisodeFolder, ClipItem } from "../types/domain";
+import { startTransition, useCallback } from "react";
 
 type episodePanelProps = {
   episodes: EpisodeEntry[];
@@ -21,50 +20,66 @@ type episodePanelProps = {
   episodesPath: string | null;
 };
 
-export default function useEpisodePanelState(props: episodePanelProps) {
+export default function useEpisodePanelState({
+  episodes,
+  setEpisodes,
+  selectedEpisodeId,
+  setSelectedEpisodeId,
+  episodeFolders,
+  setEpisodeFolders,
+  openedEpisodeId,
+  setOpenedEpisodeId,
+  selectedFolderId,
+  setSelectedFolderId,
+  setClips,
+  setSelectedClips,
+  setFocusedClip,
+  setImportedVideoPath,
+  setImportToken,
+  episodesPath,
+}: episodePanelProps) {
 
 	// Handlers
-	const handleSelectEpisode = (episodeId: string) => {
-		props.setSelectedEpisodeId(episodeId);
-		props.setSelectedFolderId(null);
-	};
+	const handleSelectEpisode = useCallback((episodeId: string) => {
+		setSelectedEpisodeId(episodeId);
+		setSelectedFolderId(null);
+	}, [setSelectedEpisodeId, setSelectedFolderId]);
 
-	const handleOpenEpisode = (episodeId: string) => {
-		const selectedEpisode = props.episodes.find((e) => e.id === episodeId);
+	const handleOpenEpisode = useCallback((episodeId: string) => {
+		const selectedEpisode = episodes.find((e) => e.id === episodeId);
 		if (!selectedEpisode) return;
 
 
-		props.setSelectedClips(new Set());
-		props.setFocusedClip(null);
-		props.setSelectedEpisodeId(episodeId);
-		props.setOpenedEpisodeId(episodeId);
-		props.setSelectedFolderId(null);
-		props.setImportedVideoPath(selectedEpisode.videoPath);
-		props.setImportToken(Date.now().toString());
+		setSelectedClips(new Set());
+		setFocusedClip(null);
+		setSelectedEpisodeId(episodeId);
+		setOpenedEpisodeId(episodeId);
+		setSelectedFolderId(null);
+		setImportedVideoPath(selectedEpisode.videoPath);
+		setImportToken(Date.now().toString());
 
 		startTransition(() => {
-			props.setClips(selectedEpisode.clips);
+			setClips(selectedEpisode.clips);
 		});
-		console.log(selectedEpisode.clips);
-	};
+	}, [episodes, setSelectedClips, setFocusedClip, setSelectedEpisodeId, setOpenedEpisodeId, setSelectedFolderId, setImportedVideoPath, setImportToken, setClips]);
 
-	const handleSelectFolder = (folderId: string | null) => {
-		props.setSelectedFolderId(folderId);
-		props.setSelectedEpisodeId(null);
-	};
+	const handleSelectFolder = useCallback((folderId: string | null) => {
+		setSelectedFolderId(folderId);
+		setSelectedEpisodeId(null);
+	}, [setSelectedFolderId, setSelectedEpisodeId]);
 
-	const handleMoveEpisodeToFolder = (episodeId: string, folderId: string | null) => {
-		props.setEpisodes((prev) =>
+	const handleMoveEpisodeToFolder = useCallback((episodeId: string, folderId: string | null) => {
+		setEpisodes((prev) =>
 			prev.map((e) => (e.id === episodeId ? { ...e, folderId } : e))
 		);
-	};
+	}, [setEpisodes]);
 
-	const handleMoveEpisode = (
+	const handleMoveEpisode = useCallback((
 		episodeId: string,
 		folderId: string | null,
 		beforeEpisodeId?: string
 	) => {
-		props.setEpisodes((prev) => {
+		setEpisodes((prev) => {
 			const fromIndex = prev.findIndex((e) => e.id === episodeId);
 			if (fromIndex === -1) return prev;
 
@@ -82,10 +97,10 @@ export default function useEpisodePanelState(props: episodePanelProps) {
 
 			return [...remaining.slice(0, toIndex), moving, ...remaining.slice(toIndex)];
 		});
-	};
+	}, [setEpisodes]);
 
-	const handleMoveFolder = (folderId: string, parentFolderId: string | null, beforeFolderId?: string) => {
-		props.setEpisodeFolders((prev) => {
+	const handleMoveFolder = useCallback((folderId: string, parentFolderId: string | null, beforeFolderId?: string) => {
+		setEpisodeFolders((prev) => {
 			const byId = new Map(prev.map((f) => [f.id, f] as const));
 			const moving = byId.get(folderId);
 			if (!moving) return prev;
@@ -127,14 +142,14 @@ export default function useEpisodePanelState(props: episodePanelProps) {
 
 			return [...remaining.slice(0, insertIndex), updatedMoving, ...remaining.slice(insertIndex)];
 		});
-	};
+	}, [setEpisodeFolders]);
 
-	const handleSortEpisodePanel = (direction: "asc" | "desc") => {
+	const handleSortEpisodePanel = useCallback((direction: "asc" | "desc") => {
 		const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 		const mult = direction === "asc" ? 1 : -1;
 
-		const folders = props.episodeFolders;
-		const episodesSnapshot = props.episodes;
+		const folders = episodeFolders;
+		const episodesSnapshot = episodes;
 
 		const foldersByParent = new Map<string | null, EpisodeFolder[]>();
 		for (const folder of folders) {
@@ -168,9 +183,9 @@ export default function useEpisodePanelState(props: episodePanelProps) {
 		};
 
 		for (const root of foldersByParent.get(null) ?? []) visit(root);
-		props.setEpisodeFolders(sortedFolders);
+		setEpisodeFolders(sortedFolders);
 
-		props.setEpisodes(() => {
+		setEpisodes(() => {
 			const result: EpisodeEntry[] = [];
 
 			// Root episodes (shown after folders in the UI).
@@ -190,37 +205,37 @@ export default function useEpisodePanelState(props: episodePanelProps) {
 
 			return result;
 		});
-	};
+	}, [episodeFolders, episodes, setEpisodeFolders, setEpisodes]);
 
-	const handleRenameEpisode = (episodeId: string, newName: string) => {
+	const handleRenameEpisode = useCallback((episodeId: string, newName: string) => {
 		const trimmed = (newName ?? "").trim();
 		if (!trimmed) return;
-		props.setEpisodes((prev) => prev.map((e) => (e.id === episodeId ? { ...e, displayName: trimmed } : e)));
-	};
+		setEpisodes((prev) => prev.map((e) => (e.id === episodeId ? { ...e, displayName: trimmed } : e)));
+	}, [setEpisodes]);
 
-	const handleRenameFolder = (folderId: string, newName: string) => {
+	const handleRenameFolder = useCallback((folderId: string, newName: string) => {
 		const trimmed = (newName ?? "").trim();
 		if (!trimmed) return;
-		props.setEpisodeFolders((prev) => prev.map((f) => (f.id === folderId ? { ...f, name: trimmed } : f)));
-	};
+		setEpisodeFolders((prev) => prev.map((f) => (f.id === folderId ? { ...f, name: trimmed } : f)));
+	}, [setEpisodeFolders]);
 
-	const handleDeleteFolder = (folderId: string) => {
-		props.setEpisodeFolders((prev) =>
+	const handleDeleteFolder = useCallback((folderId: string) => {
+		setEpisodeFolders((prev) =>
 			prev
 				.filter((f) => f.id !== folderId)
 				.map((f) => (f.parentId === folderId ? { ...f, parentId: null } : f))
 		);
-		props.setEpisodes((prev) => prev.map((e) => (e.folderId === folderId ? { ...e, folderId: null } : e)));
-		if (props.selectedFolderId === folderId) props.setSelectedFolderId(null);
-	};
+		setEpisodes((prev) => prev.map((e) => (e.folderId === folderId ? { ...e, folderId: null } : e)));
+		if (selectedFolderId === folderId) setSelectedFolderId(null);
+	}, [selectedFolderId, setEpisodeFolders, setEpisodes, setSelectedFolderId]);
 
-	const handleDeleteEpisode = (episodeId: string) => {
-		props.setEpisodes((prev) => prev.filter((e) => e.id !== episodeId));
-		if (props.selectedEpisodeId === episodeId) props.setSelectedEpisodeId(null);
-		if (props.openedEpisodeId === episodeId) props.setOpenedEpisodeId(null);
-	};
+	const handleDeleteEpisode = useCallback((episodeId: string) => {
+		setEpisodes((prev) => prev.filter((e) => e.id !== episodeId));
+		if (selectedEpisodeId === episodeId) setSelectedEpisodeId(null);
+		if (openedEpisodeId === episodeId) setOpenedEpisodeId(null);
+	}, [selectedEpisodeId, openedEpisodeId, setEpisodes, setSelectedEpisodeId, setOpenedEpisodeId]);
 
-	const handleCreateFolder = (name: string, parentFolderId: string | null) => {
+	const handleCreateFolder = useCallback((name: string, parentFolderId: string | null) => {
 		const trimmed = (name ?? "").trim();
 		if (!trimmed) return;
 
@@ -230,15 +245,15 @@ export default function useEpisodePanelState(props: episodePanelProps) {
 			parentId: parentFolderId,
 			isExpanded: true,
 		};
-		props.setEpisodeFolders((prev) => [folder, ...prev]);
-		props.setSelectedFolderId(folder.id);
-	};
+		setEpisodeFolders((prev) => [folder, ...prev]);
+		setSelectedFolderId(folder.id);
+	}, [setEpisodeFolders, setSelectedFolderId]);
 
-	const handleToggleFolderExpanded = (folderId: string) => {
-		props.setEpisodeFolders((prev) =>
+	const handleToggleFolderExpanded = useCallback((folderId: string) => {
+		setEpisodeFolders((prev) =>
 			prev.map((f) => (f.id === folderId ? { ...f, isExpanded: !f.isExpanded } : f))
 		);
-	};
+	}, [setEpisodeFolders]);
 
 	return {
 		handleSelectEpisode,

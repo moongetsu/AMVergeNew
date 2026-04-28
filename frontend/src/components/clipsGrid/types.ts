@@ -13,6 +13,8 @@ export type ClipContainerProps = {
   userHasHEVC: React.RefObject<boolean>;
   setFocusedClip: React.Dispatch<React.SetStateAction<string | null>>;
   focusedClip: string | null;
+  audioPlaybackHover: boolean;
+  hoverVolume: number;
 };
 
 export type DeferredProxy = {
@@ -52,4 +54,6 @@ export type LazyClipProps = {
   reportStaggerDemand: (key: string, demand: { order: number; onReady: () => void } | null) => void;
   videoIsHEVC: boolean | null;
   userHasHEVC: React.RefObject<boolean>;
+  audioPlaybackHover: boolean;
+  hoverVolume: number;
 };

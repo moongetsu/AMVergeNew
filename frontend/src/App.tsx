@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Event, listen } from "@tauri-apps/api/event";
 import { 
@@ -214,41 +214,16 @@ function App() {
     );
   };
     
-  // App-level hooks
-  useHEVCSupport(userHasHEVC);
-
-  usePersistence({
-    episodePanelStorageKey: EPISODE_PANEL_STORAGE_KEY,
-    sidebarWidthStorageKey: SIDEBAR_WIDTH_STORAGE_KEY,
-    exportDirStorageKey: EXPORT_DIR_STORAGE_KEY,
-    episodeFolders: state.episodeFolders,
-    episodes: state.episodes,
-    selectedFolderId: state.selectedFolderId,
-    selectedEpisodeId: state.selectedEpisodeId,
-    setEpisodeFolders,
-    setEpisodes,
-    setSelectedFolderId,
-    handleSelectEpisodeFromStorage,
-    sidebarWidthPx,
-    exportDir,
-  });
-
-  useDragDropImport({
-    setIsDragging,
-    handleImport,
-    handleBatchImport,
-  });
-
   // Episode selection
-  function handleSelectEpisode(episodeId: string) {
+  const handleSelectEpisode = useCallback((episodeId: string) => {
     dispatch({ type: "setSelectedEpisodeId", value: episodeId });
     dispatch({ type: "setSelectedFolderId", value: null });
 
     const episode = state.episodes.find((e) => e.id === episodeId);
     dispatch({ type: "setClips", value: episode ? episode.clips : [] });
-  }
+  }, [dispatch, state.episodes]);
 
-  function handleOpenEpisode(episodeId: string) {
+  const handleOpenEpisode = useCallback((episodeId: string) => {
     const episode = state.episodes.find((e) => e.id === episodeId);
     if (!episode) return;
 
@@ -256,12 +231,12 @@ function App() {
     dispatch({ type: "setOpenedEpisodeId", value: episodeId });
     dispatch({ type: "setSelectedFolderId", value: null });
     dispatch({ type: "setClips", value: episode.clips });
-  }
+  }, [dispatch, state.episodes]);
 
-  function handleSelectEpisodeFromStorage(
+  const handleSelectEpisodeFromStorage = useCallback((
     episodeId: string | null,
     episodesList?: typeof state.episodes
-  ) {
+  ) => {
     dispatch({ type: "setSelectedEpisodeId", value: episodeId ?? null });
     dispatch({ type: "setSelectedFolderId", value: null });
 
@@ -271,18 +246,18 @@ function App() {
     } else {
       dispatch({ type: "setClips", value: [] });
     }
-  }
+  }, [dispatch]);
 
   // UI handlers
-  function snapGridBigger() {
+  const snapGridBigger = useCallback(() => {
     setCols((c) => Math.max(1, c - 1));
-  }
+  }, []);
 
-  function snapGridSmaller() {
+  const snapGridSmaller = useCallback(() => {
     setCols((c) => Math.min(12, c + 1));
-  }
+  }, []);
 
-  function startSidebarResize(e: React.PointerEvent<HTMLDivElement>) {
+  const startSidebarResize = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (!sideBarEnabled) return;
 
     const wrapper = windowWrapperRef.current;
@@ -315,10 +290,10 @@ function App() {
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", stop);
     window.addEventListener("pointercancel", stop);
-  }
+  }, [sideBarEnabled]);
 
   // Backend actions
-  async function handleClearEpisodePanelCache() {
+  const handleClearEpisodePanelCache = useCallback(async () => {
     dispatch({ type: "setEpisodeFolders", value: [] });
     dispatch({ type: "setEpisodes", value: [] });
     dispatch({ type: "setSelectedFolderId", value: null });
@@ -337,9 +312,9 @@ function App() {
     } catch (err) {
       console.error("clear_episode_panel_cache failed:", err);
     }
-  }
+  }, [dispatch, generalSettings.episodesPath]);
 
-  async function handleAbort() {
+  const handleAbort = useCallback(async () => {
     abortedRef.current = true;
 
     try {
@@ -347,7 +322,32 @@ function App() {
     } catch (err) {
       console.error("abort_detect_scenes failed:", err);
     }
-  }
+  }, [abortedRef]);
+
+  // App-level hooks
+  useHEVCSupport(userHasHEVC);
+
+  usePersistence({
+    episodePanelStorageKey: EPISODE_PANEL_STORAGE_KEY,
+    sidebarWidthStorageKey: SIDEBAR_WIDTH_STORAGE_KEY,
+    exportDirStorageKey: EXPORT_DIR_STORAGE_KEY,
+    episodeFolders: state.episodeFolders,
+    episodes: state.episodes,
+    selectedFolderId: state.selectedFolderId,
+    selectedEpisodeId: state.selectedEpisodeId,
+    setEpisodeFolders,
+    setEpisodes,
+    setSelectedFolderId,
+    handleSelectEpisodeFromStorage,
+    sidebarWidthPx,
+    exportDir,
+  });
+
+  useDragDropImport({
+    setIsDragging,
+    handleImport,
+    handleBatchImport,
+  });
 
   // Effects
   useEffect(() => {

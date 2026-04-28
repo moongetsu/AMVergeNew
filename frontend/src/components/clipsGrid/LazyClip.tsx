@@ -25,6 +25,8 @@ export const LazyClip = memo(function LazyClip({
   reportStaggerDemand,
   videoIsHEVC,
   userHasHEVC,
+  audioPlaybackHover,
+  hoverVolume,
 }: LazyClipProps) {
   // state and refs for tile visibility, hover, video element, and proxy state
   const [isVisible, setIsVisible] = useState(false);
@@ -259,7 +261,8 @@ export const LazyClip = memo(function LazyClip({
 
     const shouldPlay = showVideo && shouldMountVideo;
     if (shouldPlay) {
-      v.muted = true;
+      v.muted = !(audioPlaybackHover && isHovered);
+      v.volume = hoverVolume;
       v.autoplay = true;
       v.loop = true;
       try {
@@ -276,7 +279,7 @@ export const LazyClip = memo(function LazyClip({
         // ignore
       }
     }
-  }, [showVideo, shouldMountVideo, effectiveSrc]);
+  }, [showVideo, shouldMountVideo, effectiveSrc, audioPlaybackHover, isHovered, hoverVolume]);
 
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -341,7 +344,7 @@ export const LazyClip = memo(function LazyClip({
             <video
               className="clip"
               src={`${convertFileSrc(effectiveSrc)}?v=${importToken}`}
-              muted
+              muted={!(audioPlaybackHover && isHovered)}
               loop
               autoPlay
               playsInline
@@ -355,7 +358,8 @@ export const LazyClip = memo(function LazyClip({
               }}
               onLoadedMetadata={(e) => {
                 if (gridPreview || isHovered) {
-                  e.currentTarget.muted = true;
+                  e.currentTarget.muted = !(audioPlaybackHover && isHovered);
+                  e.currentTarget.volume = hoverVolume;
                   e.currentTarget.play().catch(() => {});
                 }
               }}

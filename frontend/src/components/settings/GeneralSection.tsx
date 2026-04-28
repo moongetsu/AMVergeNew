@@ -69,6 +69,52 @@ export default function GeneralSection({
       </div>
 
       <div className="settings-row">
+        <label className="settings-label">Audio Playback Hover</label>
+        <div className="settings-control">
+          <div className="checkbox-row" style={{ margin: 0, padding: 0 }}>
+            <label className="custom-checkbox">
+              <input
+                type="checkbox"
+                className="checkbox"
+                checked={generalSettings.audioPlaybackHover}
+                onChange={(e) =>
+                  setGeneralSettings((prev) => ({
+                    ...prev,
+                    audioPlaybackHover: e.target.checked,
+                  }))
+                }
+              />
+              <span className="checkmark"></span>
+            </label>
+          </div>
+
+          {generalSettings.audioPlaybackHover && (
+            <div
+              className="settings-control"
+              style={{ marginLeft: "20px", gap: "10px", width: "auto" }}
+            >
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={generalSettings.hoverVolume}
+                onChange={(e) =>
+                  setGeneralSettings((prev) => ({
+                    ...prev,
+                    hoverVolume: parseFloat(e.target.value),
+                  }))
+                }
+              />
+              <span className="settings-value" style={{ width: "40px" }}>
+                {Math.round(generalSettings.hoverVolume * 100)}%
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="settings-row">
         <label className="settings-label">Episodes storage path</label>
         <div className="settings-control">
           <button

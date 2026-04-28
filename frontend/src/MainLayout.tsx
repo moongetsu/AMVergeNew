@@ -103,6 +103,8 @@ export default function MainLayout(props: LayoutProps) {
                     userHasHEVC={props.userHasHEVC}
                     setFocusedClip={props.setFocusedClip}
                     focusedClip={props.focusedClip}
+                    audioPlaybackHover={props.generalSettings.audioPlaybackHover}
+                    hoverVolume={props.generalSettings.hoverVolume}
                  />
             </div>
             

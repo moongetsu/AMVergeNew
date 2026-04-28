@@ -1,4 +1,4 @@
-import { useState, useRef, startTransition } from "react";
+import { useState, useRef, startTransition, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ClipItem, EpisodeEntry } from "../types/domain"
@@ -24,14 +24,172 @@ type ImportExportProps = {
   exportFormat: "mp4" | "mkv" | "mov" | "avi";
 };
 
-export default function useImportExport(props: ImportExportProps) {
+export default function useImportExport({
+  setProgress,
+  setProgressMsg,
+  setSelectedClips,
+  setFocusedClip,
+  setImportedVideoPath,
+  setVideoIsHEVC,
+  setEpisodes,
+  setSelectedEpisodeId,
+  setOpenedEpisodeId,
+  setClips,
+  episodesPath,
+  selectedFolderId,
+  abortedRef,
+  exportDir,
+  setExportDir,
+  exportFormat,
+  clips,
+}: ImportExportProps) {
   const [loading, setLoading] = useState(false);
   const [importToken, setImportToken] = useState(() => Date.now().toString());
   const importGenRef = useRef(0);
   const [batchTotal, setBatchTotal] = useState(0);
   const [batchDone, setBatchDone] = useState(0);
   const [batchCurrentFile, setBatchCurrentFile] = useState("");
-  const onImportClick = async () => {
+
+  const handleImport = useCallback(async (file: string | null) => {
+    // This opens the file dialog to select a video file
+    if (!file) return;
+
+    const episodeId = crypto.randomUUID();
+    const gen = ++importGenRef.current;
+
+    try {
+      setProgress(0);
+      setProgressMsg("Starting...");
+      setLoading(true);
+      setSelectedClips(new Set());
+      setFocusedClip(null);
+      setImportedVideoPath(file);
+      setVideoIsHEVC(null);
+      setImportToken(Date.now().toString());
+
+      const formatted = await detectScenes(file, episodeId, episodesPath);
+
+      // A newer import started while we were waiting - discard stale results.
+      if (importGenRef.current !== gen) return;
+
+      const inferredName = formatted[0]?.originalName || fileNameFromPath(file);
+
+      const episodeEntry: EpisodeEntry = {
+        id: episodeId,
+        displayName: inferredName,
+        videoPath: file,
+        folderId: selectedFolderId,
+        importedAt: Date.now(),
+        clips: formatted,
+      };
+
+      setEpisodes((prev) => [episodeEntry, ...prev]);
+      setSelectedEpisodeId(episodeId);
+      setOpenedEpisodeId(episodeId);
+      startTransition(() => {
+        setClips(formatted);
+      });
+    } catch (err) {
+      if (importGenRef.current !== gen) return;
+      console.error("Detection failed:", err);
+    } finally {
+      if (importGenRef.current === gen) setLoading(false);
+    }
+  }, [setProgress, setProgressMsg, setSelectedClips, setFocusedClip, setImportedVideoPath, setVideoIsHEVC, episodesPath, selectedFolderId, setEpisodes, setSelectedEpisodeId, setOpenedEpisodeId, setClips]);
+
+  const handleBatchImport = useCallback(async (files: string[]) => {
+    const gen = ++importGenRef.current;
+    abortedRef.current = false;
+
+    const completedEpisodes: EpisodeEntry[] = [];
+
+    try {
+      setProgress(0);
+      setProgressMsg("Starting...");
+      setLoading(true);
+      setSelectedClips(new Set());
+      setFocusedClip(null);
+      setVideoIsHEVC(null);
+      setBatchTotal(files.length);
+      setBatchDone(0);
+      setBatchCurrentFile("");
+
+      for (let i = 0; i < files.length; i++) {
+        if (abortedRef.current) break;
+        if (importGenRef.current !== gen) return;
+
+        const file = files[i];
+        const episodeId = crypto.randomUUID();
+        const fileName = fileNameFromPath(file);
+
+        setBatchDone(i);
+        setBatchCurrentFile(truncateFileName(fileName));
+        setProgress(0);
+        setProgressMsg("Starting...");
+
+        try {
+          const formatted = await detectScenes(file, episodeId, episodesPath);
+
+          if (abortedRef.current || importGenRef.current !== gen) {
+            // Aborted or superseded mid-flight — clean up this episode's cache
+            invoke("delete_episode_cache", {
+              episodeCacheId: episodeId,
+              customPath: episodesPath,
+            }).catch(() => {});
+            break;
+          }
+
+          const inferredName = formatted[0]?.originalName || fileNameFromPath(file);
+
+          const episodeEntry: EpisodeEntry = {
+            id: episodeId,
+            displayName: inferredName,
+            videoPath: file,
+            folderId: selectedFolderId,
+            importedAt: Date.now(),
+            clips: formatted,
+          };
+
+          completedEpisodes.push(episodeEntry);
+          setEpisodes((prev) => [episodeEntry, ...prev]);
+        } catch (err) {
+          if (abortedRef.current) {
+            invoke("delete_episode_cache", {
+              episodeCacheId: episodeId,
+              customPath: episodesPath,
+            }).catch(() => {});
+            break;
+          }
+          console.error(`Detection failed for ${fileName}:`, err);
+          invoke("delete_episode_cache", {
+            episodeCacheId: episodeId,
+            customPath: episodesPath,
+          }).catch(() => {});
+        }
+      }
+
+      // Open the first completed episode
+      if (completedEpisodes.length > 0 && importGenRef.current === gen) {
+        const first = completedEpisodes[0];
+        setSelectedEpisodeId(first.id);
+        setOpenedEpisodeId(first.id);
+        setImportedVideoPath(first.videoPath);
+        setImportToken(Date.now().toString());
+        startTransition(() => {
+          setClips(first.clips);
+        });
+      }
+    } finally {
+      if (importGenRef.current === gen) {
+        setLoading(false);
+        setBatchTotal(0);
+        setBatchDone(0);
+        setBatchCurrentFile("");
+      }
+    }
+  }, [abortedRef, setProgress, setProgressMsg, setSelectedClips, setFocusedClip, setVideoIsHEVC, episodesPath, selectedFolderId, setEpisodes, setSelectedEpisodeId, setOpenedEpisodeId, setImportedVideoPath, setClips]);
+
+  const onImportClick = useCallback(async () => {
     const files = await open({
       multiple: true,
       filters: [
@@ -53,167 +211,28 @@ export default function useImportExport(props: ImportExportProps) {
     } else {
       handleBatchImport(fileList);
     }
-  }
+  }, [handleImport, handleBatchImport]);
 
-  const handleImport = async (file: string | null) => {
-    // This opens the file dialog to select a video file
-    if (!file) return;
-
-    const episodeId = crypto.randomUUID();
-    const gen = ++importGenRef.current;
-
-    try {
-      props.setProgress(0);
-      props.setProgressMsg("Starting...");
-      setLoading(true);
-      props.setSelectedClips(new Set());
-      props.setFocusedClip(null);
-      props.setImportedVideoPath(file);
-      props.setVideoIsHEVC(null);
-      setImportToken(Date.now().toString());
-
-      const formatted = await detectScenes(file, episodeId, props.episodesPath);
-
-      // A newer import started while we were waiting - discard stale results.
-      if (importGenRef.current !== gen) return;
-
-      const inferredName = formatted[0]?.originalName || fileNameFromPath(file);
-
-      const episodeEntry: EpisodeEntry = {
-        id: episodeId,
-        displayName: inferredName,
-        videoPath: file,
-        folderId: props.selectedFolderId,
-        importedAt: Date.now(),
-        clips: formatted,
-      };
-
-      props.setEpisodes((prev) => [episodeEntry, ...prev]);
-      props.setSelectedEpisodeId(episodeId);
-      props.setOpenedEpisodeId(episodeId);
-      startTransition(() => {
-        props.setClips(formatted);
-      });
-    } catch (err) {
-      if (importGenRef.current !== gen) return;
-      console.error("Detection failed:", err);
-    } finally {
-      if (importGenRef.current === gen) setLoading(false);
-    }
-  };
-
-  const handleBatchImport = async (files: string[]) => {
-    const gen = ++importGenRef.current;
-    props.abortedRef.current = false;
-
-    const completedEpisodes: EpisodeEntry[] = [];
-
-    try {
-      props.setProgress(0);
-      props.setProgressMsg("Starting...");
-      setLoading(true);
-      props.setSelectedClips(new Set());
-      props.setFocusedClip(null);
-      props.setVideoIsHEVC(null);
-      setBatchTotal(files.length);
-      setBatchDone(0);
-      setBatchCurrentFile("");
-
-      for (let i = 0; i < files.length; i++) {
-        if (props.abortedRef.current) break;
-        if (importGenRef.current !== gen) return;
-
-        const file = files[i];
-        const episodeId = crypto.randomUUID();
-        const fileName = fileNameFromPath(file);
-
-        setBatchDone(i);
-        setBatchCurrentFile(truncateFileName(fileName));
-        props.setProgress(0);
-        props.setProgressMsg("Starting...");
-
-        try {
-          const formatted = await detectScenes(file, episodeId, props.episodesPath);
-
-          if (props.abortedRef.current || importGenRef.current !== gen) {
-            // Aborted or superseded mid-flight — clean up this episode's cache
-            invoke("delete_episode_cache", {
-              episodeCacheId: episodeId,
-              customPath: props.episodesPath,
-            }).catch(() => {});
-            break;
-          }
-
-          const inferredName = formatted[0]?.originalName || fileNameFromPath(file);
-
-          const episodeEntry: EpisodeEntry = {
-            id: episodeId,
-            displayName: inferredName,
-            videoPath: file,
-            folderId: props.selectedFolderId,
-            importedAt: Date.now(),
-            clips: formatted,
-          };
-
-          completedEpisodes.push(episodeEntry);
-          props.setEpisodes((prev) => [episodeEntry, ...prev]);
-        } catch (err) {
-          if (props.abortedRef.current) {
-            invoke("delete_episode_cache", {
-              episodeCacheId: episodeId,
-              customPath: props.episodesPath,
-            }).catch(() => {});
-            break;
-          }
-          console.error(`Detection failed for ${fileName}:`, err);
-          invoke("delete_episode_cache", {
-            episodeCacheId: episodeId,
-            customPath: props.episodesPath,
-          }).catch(() => {});
-        }
-      }
-
-      // Open the first completed episode
-      if (completedEpisodes.length > 0 && importGenRef.current === gen) {
-        const first = completedEpisodes[0];
-        props.setSelectedEpisodeId(first.id);
-        props.setOpenedEpisodeId(first.id);
-        props.setImportedVideoPath(first.videoPath);
-        setImportToken(Date.now().toString());
-        startTransition(() => {
-          props.setClips(first.clips);
-        });
-      }
-    } finally {
-      if (importGenRef.current === gen) {
-        setLoading(false);
-        setBatchTotal(0);
-        setBatchDone(0);
-        setBatchCurrentFile("");
-      }
-    }
-  };
-
-  const handleExport = async(selectedClips: Set<string>, mergeEnabled: boolean, mergeFileName?: string) => {
+  const handleExport = useCallback(async(selectedClips: Set<string>, mergeEnabled: boolean, mergeFileName?: string) => {
     if (selectedClips.size === 0) return;
 
-    const selected = props.clips.filter((c: ClipItem) => selectedClips.has(c.id));
+    const selected = clips.filter((c: ClipItem) => selectedClips.has(c.id));
     if (selected.length === 0) return;
 
     // If no export directory is set, prompt the user to pick one first
-    let dir = props.exportDir;
+    let dir = exportDir;
     if (!dir) {
         const picked = await open({ directory: true, multiple: false });
         if (!picked) return;
         dir = picked as string;
-        props.setExportDir(dir);
+        setExportDir(dir);
     }
 
     try {
         setLoading(true);
 
         const clipArray = selected.map((c: ClipItem) => c.src);
-        const format = props.exportFormat || "mp4";
+        const format = exportFormat || "mp4";
 
         if (mergeEnabled) {
         const baseName = mergeFileName || ((selected[0]?.originalName || "episode") + "_merged");
@@ -244,12 +263,12 @@ export default function useImportExport(props: ImportExportProps) {
     } finally {
         setLoading(false);
     }
-  };
+  }, [clips, exportDir, exportFormat, setExportDir]);
 
-  const handlePickExportDir = async () => {
+  const handlePickExportDir = useCallback(async () => {
     const dir = await open({ directory: true, multiple: false });
-    if (dir) props.setExportDir(dir as string);
-  };
+    if (dir) setExportDir(dir as string);
+  }, [setExportDir]);
 
   return {
     loading,
