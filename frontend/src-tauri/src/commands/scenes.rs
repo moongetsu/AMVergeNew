@@ -23,6 +23,7 @@ pub async fn detect_scenes(
     episode_cache_id: Option<String>,
     custom_path: Option<String>,
     method: String,
+    threshold: f64,
 ) -> Result<String, String> {
     let video_name = file_name_only(&video_path);
 
@@ -64,7 +65,7 @@ pub async fn detect_scenes(
             .unwrap_or("python.exe");
         console_log(
             "SCENE|spawn",
-            &format!("mode=dev exe={python_name} script=app.py args=[{video_name},{output_dir_base},{method}]"),
+            &format!("mode=dev exe={python_name} script=app.py args=[{video_name},{output_dir_base},{method},{threshold}]"),
         );
 
         let mut cmd = Command::new(python_path);
@@ -73,6 +74,7 @@ pub async fn detect_scenes(
             .arg(&video_path)
             .arg(&output_dir_str)
             .arg(&method)
+            .arg(threshold.to_string())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -98,7 +100,7 @@ pub async fn detect_scenes(
             .unwrap_or("backend_script.exe");
         console_log(
             "SCENE|spawn",
-            &format!("mode=prod exe={backend_name} args=[{video_name},{output_dir_base},{method}]"),
+            &format!("mode=prod exe={backend_name} args=[{video_name},{output_dir_base},{method},{threshold}]"),
         );
 
         let mut cmd = Command::new(backend);
@@ -107,6 +109,7 @@ pub async fn detect_scenes(
             .arg(&video_path)
             .arg(&output_dir_str)
             .arg(&method)
+            .arg(threshold.to_string())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()

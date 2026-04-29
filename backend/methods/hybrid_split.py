@@ -6,7 +6,7 @@ import numpy as np
 from utils.scene_utils import run_stage, run_ffmpeg_segment, collect_scenes, generate_thumbnails
 from utils.video_utils import merge_short_scenes, emit_progress
 
-def run_hybrid_split(video_path: str, output_dir: str, log_fn, method="hybrid") -> list[dict[str, Any]]:
+def run_hybrid_split(video_path: str, output_dir: str, log_fn, method="hybrid", threshold=0.4) -> list[dict[str, Any]]:
     os.makedirs(output_dir, exist_ok=True)
     total_start = time.perf_counter()
     file_name = os.path.splitext(os.path.basename(video_path))[0]
@@ -15,7 +15,7 @@ def run_hybrid_split(video_path: str, output_dir: str, log_fn, method="hybrid") 
     cut_points = run_stage(
         10,
         f"Running {method} detection...",
-        lambda: _get_consensus_cuts(video_path, method, log_fn),
+        lambda: _get_consensus_cuts(video_path, method, log_fn, threshold),
         log_fn
     )
 
@@ -56,7 +56,7 @@ def run_hybrid_split(video_path: str, output_dir: str, log_fn, method="hybrid") 
 
     return final_scenes
 
-def _get_consensus_cuts(video_path, method, log_fn):
+def _get_consensus_cuts(video_path, method, log_fn, sensitivity_threshold=0.4):
     all_detectors_cuts = []
     
     # Try PySceneDetect first (Content/Adaptive)
@@ -81,18 +81,27 @@ def _get_consensus_cuts(video_path, method, log_fn):
         log_fn("scenedetect not installed. Skipping pixel-based detection.")
         if method != "hybrid": return []
 
+    # Try OmniShotCut
+    if method in ["omnishotcut", "hybrid"]:
+        try:
+            from methods.omnishotcut_split import trim_scenes_omnishotcut
+            log_fn("Running OmniShotCut...")
+            # We call the method and extract the start times
+            os_scenes = trim_scenes_omnishotcut(video_path, os.path.dirname(video_path), lambda x: None, threshold=sensitivity_threshold)
+            os_cuts = [float(s["start_time"]) for s in os_scenes if float(s["start_time"]) > 0]
+            all_detectors_cuts.append(os_cuts)
+            log_fn(f"OmniShotCut cuts: {len(os_cuts)}")
+        except Exception as e:
+            log_fn(f"OmniShotCut error: {e}")
+
     # Try TransNet V2
     if method in ["transnetv2", "hybrid"]:
         try:
-            from methods.transnet_split import _run_transnet_inference
+            from methods.transnet_split import trim_scenes_transnetv2
             log_fn("Running TransNet V2...")
-            # We need a way to get raw timestamps from transnet_split
-            # For now let's assume we can import its helper or we copy logic
-            # To keep it simple, let's just use the existing transnet logic
-            from methods import trim_scenes_transnetv2
-            # But we want the raw cut points... 
-            # I'll just use a simplified version of TransNet inference here
-            tn_cuts = _get_transnet_raw_cuts(video_path, log_fn)
+            # Use the existing method but skip the file cutting
+            tn_scenes = trim_scenes_transnetv2(video_path, os.path.dirname(video_path), lambda x: None, threshold=sensitivity_threshold)
+            tn_cuts = [float(s["start_time"]) for s in tn_scenes if float(s["start_time"]) > 0]
             all_detectors_cuts.append(tn_cuts)
             log_fn(f"TransNet cuts: {len(tn_cuts)}")
         except Exception as e:

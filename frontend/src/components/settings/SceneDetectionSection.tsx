@@ -97,24 +97,62 @@ export default function SceneDetectionSection({
             onChange={(e) =>
               setGeneralSettings((prev) => ({
                 ...prev,
-                sceneDetectionMethod: e.target.value as "amverge" | "transnetv2",
+                sceneDetectionMethod: e.target.value as "amverge" | "transnetv2" | "omnishotcut" | "hybrid",
               }))
             }
             style={{ width: "240px" }}
           >
             <option value="amverge">AMVerge (Fast)</option>
             <option value="transnetv2">TransNet V2 (Accurate AI)</option>
+            <option value="omnishotcut">OmniShotCut (Elite Transformer)</option>
+            <option value="hybrid">Hybrid (Heuristic + AI Consensus)</option>
           </select>
         </div>
       </div>
+
+      {/* Threshold / Sensitivity Slider - Shown for AI methods */}
+      {generalSettings.sceneDetectionMethod !== "amverge" && (
+        <div className="settings-row" style={{ marginTop: "-8px", marginBottom: "12px" }}>
+          <label className="settings-label" style={{ fontSize: "0.85rem", opacity: 0.8 }}>Sensitivity (Threshold)</label>
+          <div className="settings-control" style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <input
+              type="range"
+              min="0.1"
+              max="0.95"
+              step="0.05"
+              value={generalSettings.sceneDetectionThreshold}
+              onChange={(e) => setGeneralSettings(prev => ({ ...prev, sceneDetectionThreshold: parseFloat(e.target.value) }))}
+              className="settings-slider"
+              style={{ width: "180px", accentColor: "#4CAF50" }}
+            />
+            <span style={{ 
+              fontSize: "0.9rem", 
+              fontWeight: "bold", 
+              color: generalSettings.sceneDetectionThreshold < 0.3 ? "#ff5252" : (generalSettings.sceneDetectionThreshold > 0.7 ? "#ffeb3b" : "#4CAF50"),
+              minWidth: "40px" 
+            }}>
+              {Math.round((1 - generalSettings.sceneDetectionThreshold) * 100)}%
+            </span>
+          </div>
+        </div>
+      )}
       <p style={{ fontSize: "0.85rem", opacity: 0.6, marginLeft: "24px", marginBottom: "24px", marginTop: "-4px", lineHeight: "1.4" }}>
         {generalSettings.sceneDetectionMethod === "amverge" 
-          ? "The standard algorithm. Splits scenes quickly using keyframe analysis without needing AI models."
-          : "Deep learning model for pixel-perfect anime scene detection. Requires a one-time AI model download."}
+          ? "Standard algorithm. Splits scenes quickly using keyframe analysis without needing AI models."
+          : generalSettings.sceneDetectionMethod === "transnetv2"
+          ? "Deep learning model for pixel-perfect anime scene detection. Lower sensitivity to catch more subtle cuts."
+          : generalSettings.sceneDetectionMethod === "omnishotcut"
+          ? "Shot-Query Transformer with relational reasoning. Highly recommended for complex anime transitions."
+          : "Maximum accuracy mode. Combines heuristics with AI consensus for mission-critical scene splitting."}
+        {generalSettings.sceneDetectionMethod !== "amverge" && (
+          <span style={{ display: "block", marginTop: "4px", color: generalSettings.sceneDetectionThreshold < 0.3 ? "#ff5252" : "inherit", opacity: generalSettings.sceneDetectionThreshold < 0.3 ? 1 : 0.8 }}>
+             {generalSettings.sceneDetectionThreshold < 0.3 ? "⚠️ High sensitivity may cause many false positives in high-motion scenes." : "Balance sensitivity based on the video complexity."}
+          </span>
+        )}
       </p>
 
-      {/* Hardware Status Panel - Only shown for TransNet V2 */}
-      {generalSettings.sceneDetectionMethod === "transnetv2" && (
+      {/* Hardware Status Panel - Shown for AI methods */}
+      {(generalSettings.sceneDetectionMethod !== "amverge") && (
         <div style={{ 
           marginTop: "12px",
           padding: "20px", 

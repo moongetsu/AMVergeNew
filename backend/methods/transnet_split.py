@@ -6,7 +6,7 @@ import torch
 from utils.scene_utils import run_stage, run_ffmpeg_segment, collect_scenes, generate_thumbnails
 from utils.video_utils import emit_progress, merge_short_scenes
 
-def trim_scenes_transnetv2(video_path: str, output_dir: str, log_fn) -> list[dict[str, Any]]:
+def trim_scenes_transnetv2(video_path: str, output_dir: str, log_fn, threshold: float = 0.5) -> list[dict[str, Any]]:
     os.makedirs(output_dir, exist_ok=True)
     total_start = time.perf_counter()
     file_name = os.path.splitext(os.path.basename(video_path))[0]
@@ -121,7 +121,7 @@ def trim_scenes_transnetv2(video_path: str, output_dir: str, log_fn) -> list[dic
         if len(full_predictions.shape) > 1:
             full_predictions = full_predictions.flatten()
 
-        scenes = model.predictions_to_scenes(full_predictions)
+        scenes = model.predictions_to_scenes(full_predictions, threshold=threshold)
         
         return [{"start_time": s[0] / fps} for s in scenes]
 

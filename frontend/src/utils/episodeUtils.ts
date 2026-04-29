@@ -9,14 +9,16 @@ export const detectScenes = async (
   videoPath: string,
   episodeCacheId: string,
   customPath: string | null = null,
-  method: string = "keyframes"
+  method: string = "keyframes",
+  threshold: number = 0.4
 ) => {
     // calls backend passing in video file and threshold
     const result = await invoke<string>("detect_scenes", {
       videoPath: videoPath,
       episodeCacheId: episodeCacheId,
       customPath: customPath,
-      method: method
+      method: method,
+      threshold: threshold
     });
 
     // contains path to all clips along w other metadata

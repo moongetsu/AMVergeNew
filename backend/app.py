@@ -10,7 +10,7 @@ from typing import Any
 import av
 from PIL import Image
 
-from methods import trim_scenes_at_keyframes, trim_scenes_transnetv2
+from methods import trim_scenes_at_keyframes, trim_scenes_transnetv2, trim_scenes_omnishotcut, run_hybrid_split
 
 # Running commands like ffmpeg can open a command window on Windows.
 # This prevents that when the backend is launched from the app.
@@ -91,9 +91,14 @@ def main() -> int:
         input_file = sys.argv[1]
         output_dir = sys.argv[2]
         method = sys.argv[3] if len(sys.argv) > 3 else "amverge"
+        threshold = float(sys.argv[4]) if len(sys.argv) > 4 else 0.4
 
         if method == "transnetv2":
-            scenes = trim_scenes_transnetv2(input_file, output_dir, log)
+            scenes = trim_scenes_transnetv2(input_file, output_dir, log, threshold=threshold)
+        elif method == "omnishotcut":
+            scenes = trim_scenes_omnishotcut(input_file, output_dir, log, threshold=threshold)
+        elif method == "hybrid":
+            scenes = run_hybrid_split(input_file, output_dir, log, threshold=threshold)
         else:
             # 'amverge' or default falls back to keyframes
             scenes = trim_scenes_at_keyframes(input_file, output_dir, log)

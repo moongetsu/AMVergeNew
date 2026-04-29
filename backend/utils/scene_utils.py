@@ -75,8 +75,15 @@ def generate_thumbnails(output_dir: str, scenes: list[dict[str, Any]], file_name
                 emit_progress(90, f"Generating thumbnails... {completed}/{total}")
 
 def run_ffmpeg_segment(video_path: str, output_pattern: str, cut_points: list[float], log_fn) -> None:
+    # --- FRAME PERFECT FIX ---
+    # We force keyframes at exactly the cut points and re-encode using ultrafast x264.
+    # This ensures cuts happen at the exact frame the AI detected, not just at the nearest keyframe.
     cmd = [
-        FFMPEG, "-y", "-i", video_path, "-c", "copy", "-f", "segment",
+        FFMPEG, "-y", "-i", video_path,
+        "-force_key_frames", ",".join(format_timestamp(p) for p in cut_points),
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
+        "-c:a", "copy",
+        "-f", "segment",
         "-segment_times", ",".join(format_timestamp(point) for point in cut_points),
         "-reset_timestamps", "1", output_pattern
     ]
