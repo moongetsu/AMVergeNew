@@ -153,11 +153,14 @@ def _get_transnet_raw_cuts(video_path, log_fn):
         
         if torch.cuda.is_available():
             torch.backends.cudnn.benchmark = True
+            device_str = "cuda"
             device = torch.device("cuda")
         else:
+            device_str = "cpu"
             device = torch.device("cpu")
             
-        model = TransNetV2()
+        # FIX: Ensure device is explicitly passed during initialization
+        model = TransNetV2(device=device_str)
         model = model.to(device)
         model.eval()
             

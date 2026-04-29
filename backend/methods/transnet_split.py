@@ -21,13 +21,17 @@ def trim_scenes_transnetv2(video_path: str, output_dir: str, log_fn) -> list[dic
             import os
             os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
             torch.backends.cudnn.benchmark = True
+            device_str = "cuda"
             device = torch.device("cuda")
             log_fn("CUDA available! Moving TransNetV2 to GPU...")
         else:
+            device_str = "cpu"
             device = torch.device("cpu")
             log_fn("CUDA not found. Falling back to CPU...")
 
-        model = TransNetV2()
+        # FIX: The transnetv2_pytorch package requires device to be passed in constructor
+        # otherwise internal buffers/weights may remain on CPU despite .to(device)
+        model = TransNetV2(device=device_str)
         model = model.to(device)
         model.eval()
         
