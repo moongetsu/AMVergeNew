@@ -22,6 +22,7 @@ pub async fn detect_scenes(
     video_path: String,
     episode_cache_id: Option<String>,
     custom_path: Option<String>,
+    method: String,
 ) -> Result<String, String> {
     let video_name = file_name_only(&video_path);
 
@@ -63,7 +64,7 @@ pub async fn detect_scenes(
             .unwrap_or("python.exe");
         console_log(
             "SCENE|spawn",
-            &format!("mode=dev exe={python_name} script=app.py args=[{video_name},{output_dir_base}]"),
+            &format!("mode=dev exe={python_name} script=app.py args=[{video_name},{output_dir_base},{method}]"),
         );
 
         let mut cmd = Command::new(python_path);
@@ -71,6 +72,7 @@ pub async fn detect_scenes(
         cmd.arg(script_path)
             .arg(&video_path)
             .arg(&output_dir_str)
+            .arg(&method)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -96,7 +98,7 @@ pub async fn detect_scenes(
             .unwrap_or("backend_script.exe");
         console_log(
             "SCENE|spawn",
-            &format!("mode=prod exe={backend_name} args=[{video_name},{output_dir_base}]"),
+            &format!("mode=prod exe={backend_name} args=[{video_name},{output_dir_base},{method}]"),
         );
 
         let mut cmd = Command::new(backend);
@@ -104,6 +106,7 @@ pub async fn detect_scenes(
         cmd.current_dir(&exe_dir)
             .arg(&video_path)
             .arg(&output_dir_str)
+            .arg(&method)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -238,4 +241,104 @@ pub async fn abort_detect_scenes(sidecar_state: State<'_, ActiveSidecar>) -> Res
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn get_gpu_status(app: AppHandle) -> Result<String, String> {
+    let child = if cfg!(debug_assertions) {
+        let mut root = std::env::current_dir().map_err(|e| e.to_string())?;
+        root.pop();
+        root.pop();
+
+        let script_path = root.join("backend").join("app.py");
+        let python_path = root.join("backend").join("venv").join("Scripts").join("python.exe");
+
+        let mut cmd = Command::new(python_path);
+        apply_no_window(&mut cmd);
+        cmd.arg(script_path)
+            .arg("gpu_info")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .map_err(|e| format!("Failed to spawn python: {e}"))?
+    } else {
+        let exe_dir = std::env::current_exe()
+            .map_err(|e| format!("Can't find current exe: {e}"))?
+            .parent()
+            .ok_or("Can't get exe directory")?
+            .to_path_buf();
+
+        let backend = app
+            .path()
+            .resolve(
+                "bin/backend_script-x86_64-pc-windows-msvc/backend_script.exe",
+                tauri::path::BaseDirectory::Resource,
+            )
+            .map_err(|e| e.to_string())?;
+
+        let mut cmd = Command::new(backend);
+        apply_no_window(&mut cmd);
+        cmd.current_dir(&exe_dir)
+            .arg("gpu_info")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .map_err(|e| format!("Failed to spawn backend exe: {e}"))?
+    };
+
+    if !child.status.success() {
+        return Err(String::from_utf8_lossy(&child.stderr).to_string());
+    }
+
+    Ok(String::from_utf8_lossy(&child.stdout).to_string())
+}
+
+#[tauri::command]
+pub async fn install_cuda_pytorch(app: AppHandle) -> Result<String, String> {
+    let child = if cfg!(debug_assertions) {
+        let mut root = std::env::current_dir().map_err(|e| e.to_string())?;
+        root.pop();
+        root.pop();
+
+        let script_path = root.join("backend").join("app.py");
+        let python_path = root.join("backend").join("venv").join("Scripts").join("python.exe");
+
+        let mut cmd = Command::new(python_path);
+        apply_no_window(&mut cmd);
+        cmd.arg(script_path)
+            .arg("install_gpu")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .map_err(|e| format!("Failed to spawn python: {e}"))?
+    } else {
+        let exe_dir = std::env::current_exe()
+            .map_err(|e| format!("Can't find current exe: {e}"))?
+            .parent()
+            .ok_or("Can't get exe directory")?
+            .to_path_buf();
+
+        let backend = app
+            .path()
+            .resolve(
+                "bin/backend_script-x86_64-pc-windows-msvc/backend_script.exe",
+                tauri::path::BaseDirectory::Resource,
+            )
+            .map_err(|e| e.to_string())?;
+
+        let mut cmd = Command::new(backend);
+        apply_no_window(&mut cmd);
+        cmd.current_dir(&exe_dir)
+            .arg("install_gpu")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .map_err(|e| format!("Failed to spawn backend exe: {e}"))?
+    };
+
+    if !child.status.success() {
+        return Err(String::from_utf8_lossy(&child.stderr).to_string());
+    }
+
+    Ok(String::from_utf8_lossy(&child.stdout).to_string())
 }

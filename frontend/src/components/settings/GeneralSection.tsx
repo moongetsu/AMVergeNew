@@ -157,6 +157,29 @@ export default function GeneralSection({
         The location where your processed episodes and clips are stored.
       </p>
 
+      <div className="settings-row">
+        <label className="settings-label">Developer Console</label>
+        <div className="settings-control">
+          <label className="custom-checkbox">
+            <input
+              type="checkbox"
+              className="checkbox"
+              checked={generalSettings.developerMode}
+              onChange={(e) =>
+                setGeneralSettings((prev) => ({
+                  ...prev,
+                  developerMode: e.target.checked,
+                }))
+              }
+            />
+            <span className="checkmark"></span>
+          </label>
+        </div>
+      </div>
+      <p style={{ fontSize: "0.8rem", opacity: 0.6, marginLeft: "24px", marginBottom: "16px", marginTop: "-4px" }}>
+        Enables advanced debugging features and a dedicated Developer tab for installation logs.
+      </p>
+
       <div
         className="settings-row"
         style={{

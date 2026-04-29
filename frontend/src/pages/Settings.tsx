@@ -2,14 +2,10 @@ import { useState } from "react";
 import GeneralSection from "../components/settings/GeneralSection";
 import AppearanceSection from "../components/settings/AppearanceSection";
 import DiscordRPCSection from "../components/settings/DiscordRPCSection";
+import SceneDetectionSection from "../components/settings/SceneDetectionSection";
+import DeveloperSection from "../components/settings/DeveloperSection";
 import { type ThemeSettings } from "../settings/themeSettings";
 import { type GeneralSettings } from "../settings/generalSettings";
-
-const PAGES = [
-  { key: "general", label: "General" },
-  { key: "appearance", label: "Appearance" },
-  { key: "discord", label: "Discord RPC" },
-];
 
 type SettingsProps = {
   themeSettings: ThemeSettings;
@@ -31,6 +27,14 @@ export default function Settings({
   onThemeReset,
 }: SettingsProps) {
   const [activeTab, setActiveTab] = useState("general");
+
+  const PAGES = [
+    { key: "general", label: "General" },
+    { key: "appearance", label: "Appearance" },
+    { key: "scene_detection", label: "Scene Detection" },
+    { key: "discord", label: "Discord RPC" },
+    ...(generalSettings.developerMode ? [{ key: "developer", label: "Developer" }] : []),
+  ];
 
   return (
     <div className="menu-page">
@@ -70,11 +74,22 @@ export default function Settings({
               />
             )}
 
+            {activeTab === "scene_detection" && (
+              <SceneDetectionSection
+                generalSettings={generalSettings}
+                setGeneralSettings={setGeneralSettings}
+              />
+            )}
+
             {activeTab === "discord" && (
               <DiscordRPCSection
                 generalSettings={generalSettings}
                 setGeneralSettings={setGeneralSettings}
               />
+            )}
+
+            {activeTab === "developer" && generalSettings.developerMode && (
+              <DeveloperSection />
             )}
           </div>
         </div>

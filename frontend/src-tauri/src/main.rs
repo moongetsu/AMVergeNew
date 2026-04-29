@@ -19,6 +19,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::scenes::detect_scenes,
             commands::scenes::abort_detect_scenes,
+            commands::scenes::get_gpu_status,
+            commands::scenes::install_cuda_pytorch,
             commands::export::export_clips,
             commands::preview::check_hevc,
             commands::preview::hover_preview_error,

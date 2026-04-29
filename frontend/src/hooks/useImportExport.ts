@@ -92,7 +92,7 @@ export default function useImportExport(props: ImportExportProps) {
         buttons: props.generalSettings.rpcShowButtons,
       });
 
-      const formatted = await detectScenes(file, episodeId, props.episodesPath);
+      const formatted = await detectScenes(file, episodeId, props.episodesPath, props.generalSettings.sceneDetectionMethod);
 
       // A newer import started while we were waiting - discard stale results.
       if (importGenRef.current !== gen) return;
@@ -153,7 +153,7 @@ export default function useImportExport(props: ImportExportProps) {
         props.setProgressMsg("Starting...");
 
         try {
-          const formatted = await detectScenes(file, episodeId, props.episodesPath);
+          const formatted = await detectScenes(file, episodeId, props.episodesPath, props.generalSettings.sceneDetectionMethod);
 
           if (props.abortedRef.current || importGenRef.current !== gen) {
             // Aborted or superseded mid-flight — clean up this episode's cache

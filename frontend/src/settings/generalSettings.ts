@@ -9,6 +9,8 @@ export type GeneralSettings = {
     rpcShowFilename: boolean;
     rpcShowButtons: boolean;
     rpcShowMiniIcons: boolean;
+    sceneDetectionMethod: "amverge" | "transnetv2";
+    developerMode: boolean;
 };
 
 export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
@@ -19,7 +21,9 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
     enableDiscordRPC: true,
     rpcShowFilename: true,
     rpcShowButtons: true,
-    rpcShowMiniIcons: true
+    rpcShowMiniIcons: true,
+    sceneDetectionMethod: "amverge",
+    developerMode: false
 }
 
 export function loadGeneralSettings(): GeneralSettings {
@@ -38,6 +42,10 @@ export function loadGeneralSettings(): GeneralSettings {
             rpcShowFilename: typeof parsed.rpcShowFilename === "boolean" ? parsed.rpcShowFilename : DEFAULT_GENERAL_SETTINGS.rpcShowFilename,
             rpcShowButtons: typeof parsed.rpcShowButtons === "boolean" ? parsed.rpcShowButtons : DEFAULT_GENERAL_SETTINGS.rpcShowButtons,
             rpcShowMiniIcons: typeof parsed.rpcShowMiniIcons === "boolean" ? parsed.rpcShowMiniIcons : DEFAULT_GENERAL_SETTINGS.rpcShowMiniIcons,
+            sceneDetectionMethod: (["amverge", "transnetv2"].includes(parsed.sceneDetectionMethod as any))
+                ? (parsed.sceneDetectionMethod as any)
+                : DEFAULT_GENERAL_SETTINGS.sceneDetectionMethod,
+            developerMode: typeof parsed.developerMode === "boolean" ? parsed.developerMode : DEFAULT_GENERAL_SETTINGS.developerMode,
         };
     } catch {
         return DEFAULT_GENERAL_SETTINGS;

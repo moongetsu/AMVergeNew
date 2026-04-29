@@ -8,13 +8,15 @@ export const truncateFileName = (name: string): string => {
 export const detectScenes = async (
   videoPath: string,
   episodeCacheId: string,
-  customPath: string | null = null
+  customPath: string | null = null,
+  method: string = "keyframes"
 ) => {
     // calls backend passing in video file and threshold
     const result = await invoke<string>("detect_scenes", {
       videoPath: videoPath,
       episodeCacheId: episodeCacheId,
       customPath: customPath,
+      method: method
     });
 
     // contains path to all clips along w other metadata
