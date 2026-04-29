@@ -17,6 +17,9 @@ def trim_scenes_transnetv2(video_path: str, output_dir: str, log_fn) -> list[dic
         
         # Performance optimizations
         if torch.cuda.is_available():
+            # Silence deterministic warnings by setting CuBLAS config
+            import os
+            os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
             torch.backends.cudnn.benchmark = True
             device = torch.device("cuda")
             log_fn("CUDA available! Moving TransNetV2 to GPU...")
@@ -38,23 +41,84 @@ def trim_scenes_transnetv2(video_path: str, output_dir: str, log_fn) -> list[dic
             log_fn("WARNING: Model failed to move to GPU. Processing will be slow.")
 
         log_fn(f"Running optimized TransNetV2 inference...")
-        # predict_video is generally more optimized for GPU than detect_scenes
-        video_frames, single_frame_predictions, all_frame_predictions = model.predict_video(video_path)
         
-        # FIX: Convert tensor to numpy before calling library method
-        if torch.is_tensor(single_frame_predictions):
-            single_frame_predictions = single_frame_predictions.cpu().numpy()
-            
-        scenes = model.predictions_to_scenes(single_frame_predictions)
+        # We implement a custom streaming batch processor to avoid loading the whole video into RAM
+        import cv2
+        import numpy as np
         
-        # Convert frame indices to seconds
         cap = cv2.VideoCapture(video_path)
         fps = cap.get(cv2.CAP_PROP_FPS)
-        cap.release()
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        
         if fps <= 0: fps = 23.976
         
-        # Format like the previous detect_scenes output if needed, 
-        # or just return raw timestamps for the next step.
+        log_fn(f"Video Info: {width}x{height} @ {fps}fps, {total_frames} frames total.")
+        
+        predictions = []
+        batch_size = 100 # Standard sequence length for TransNetV2
+        
+        # Pre-allocate a batch buffer for speed
+        batch_frames = np.zeros((batch_size, 27, 48, 3), dtype=np.uint8)
+        
+        current_frame = 0
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                # Process the remaining frames in the last partial batch
+                remainder = current_frame % batch_size
+                if remainder > 0:
+                    # Unsqueeze to add the batch dimension: [1, remainder, 27, 48, 3]
+                    batch_tensor = torch.from_numpy(batch_frames[:remainder]).to(device).unsqueeze(0)
+                    with torch.no_grad():
+                        # model(batch_tensor) returns (logits, dict)
+                        logits, _ = model(batch_tensor)
+                        probs = torch.sigmoid(logits)
+                        # We flatten to (remainder,) and append
+                        predictions.append(probs.cpu().numpy().reshape(-1))
+                break
+                
+            # Resize frame to model input size (27x48)
+            # cv2.resize takes (width, height)
+            resized = cv2.resize(frame, (48, 27))
+            # Convert BGR to RGB
+            resized = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
+            
+            batch_frames[current_frame % batch_size] = resized
+            current_frame += 1
+            
+            if current_frame % batch_size == 0:
+                # Convert batch to tensor and move to GPU
+                # We MUST unsqueeze to make it 5D: [Batch=1, Time=100, H=27, W=48, C=3]
+                batch_tensor = torch.from_numpy(batch_frames).to(device).unsqueeze(0)
+                
+                with torch.no_grad():
+                    # Run inference on batch
+                    logits, _ = model(batch_tensor)
+                    # Apply sigmoid to get probabilities (0.0 to 1.0)
+                    probs = torch.sigmoid(logits)
+                    predictions.append(probs.cpu().numpy().reshape(-1))
+                
+                if current_frame % 500 == 0:
+                    progress_val = 10 + int(30 * (current_frame / max(1, total_frames)))
+                    emit_progress(progress_val, f"Analyzing frames: {current_frame}/{total_frames}")
+
+        cap.release()
+        
+        if not predictions:
+            log_fn("No frames processed or no predictions made.")
+            return []
+            
+        # Concatenate all batch predictions into a single 1D array of probabilities
+        full_predictions = np.concatenate(predictions, axis=0)
+        # Note: TransNetV2 usually returns (batch, 1) or (batch, 2)
+        # We flatten it to 1D array of probabilities
+        if len(full_predictions.shape) > 1:
+            full_predictions = full_predictions.flatten()
+
+        scenes = model.predictions_to_scenes(full_predictions)
+        
         return [{"start_time": s[0] / fps} for s in scenes]
 
     scenes_data = run_stage(
