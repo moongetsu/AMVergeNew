@@ -25,6 +25,8 @@ export type TimelineSegment = {
   sourceEnd?: number;
   /** Whether the backend is currently merging or splitting this segment */
   isProcessing?: boolean;
+  /** Proxy version of the clip for high-performance timeline scrubbing */
+  proxyClip?: ClipItem;
   /** Info about a pending split operation */
   splitInfo?: {
     originalId: string;

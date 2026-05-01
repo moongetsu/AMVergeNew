@@ -298,10 +298,9 @@ function timelineReducer(state: TimelineState, action: Action): TimelineState {
         segments: state.segments.map(s => s.id === action.id ? { 
           ...s, 
           isProcessing: false, 
+          isProcessing: false, 
           label: "Merged",
-          sourceClip: s.sourceClip ? { ...s.sourceClip, src: action.newSrc, srcList: [] } : undefined,
-          sourceStart: 0,
-          sourceEnd: s.end - s.start
+          proxyClip: s.sourceClip ? { ...s.sourceClip, src: action.newSrc, srcList: [] } : undefined,
         } : s)
       };
     }
@@ -320,15 +319,13 @@ function timelineReducer(state: TimelineState, action: Action): TimelineState {
           ...s,
           isProcessing: false,
           label: action.part === 1 ? "Split Part 1" : "Split Part 2",
-          sourceClip: s.sourceClip ? {
+          proxyClip: s.sourceClip ? {
             ...s.sourceClip,
             src: action.newSrc,
             thumbnail: action.newThumb || s.sourceClip.thumbnail,
             start: 0,
             end: action.newDuration
           } : undefined,
-          sourceStart: 0,
-          sourceEnd: action.newDuration,
           splitInfo: undefined
         } : s)
       };

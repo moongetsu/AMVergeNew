@@ -50,29 +50,31 @@ export default function EditorPage({
     
     if (!seg || !seg.sourceClip) return null;
 
-    let sourceStart = seg.sourceStart ?? 0;
+    const hasProxy = !!seg.proxyClip;
+    const finalSrc = hasProxy ? seg.proxyClip!.src : seg.sourceClip.src;
+    let finalSourceStart = hasProxy ? 0 : (seg.sourceStart ?? 0);
 
-    // HEALING: If the source is a Precut/Split file (local generated clip) 
-    // but has a large offset that doesn't match the clip metadata, reset it.
-    const src = seg.sourceClip?.src || "";
-    const isSplitFile = 
-        src.includes("Precut") || 
-        src.includes("split") || 
-        src.includes("_part") || 
-        src.includes("\\episodes\\") ||
-        src.includes("/episodes/");
-    
-    if (isSplitFile && sourceStart > 0.001) { 
-        sourceStart = 0;
+    // HEALING: Only apply if NOT using a proxy (proxies are always 0-indexed)
+    if (!hasProxy) {
+      const isSplitFile = 
+          finalSrc.includes("Precut") || 
+          finalSrc.includes("split") || 
+          finalSrc.includes("_part") || 
+          finalSrc.includes("\\episodes\\") ||
+          finalSrc.includes("/episodes/");
+      
+      if (isSplitFile && finalSourceStart > 0.001) { 
+          finalSourceStart = 0;
+      }
     }
 
     return {
       id: seg.id,
       clipId: seg.sourceClip.id,
-      src: seg.sourceClip.src,
-      thumbnail: seg.sourceClip.thumbnail,
+      src: finalSrc,
+      thumbnail: seg.proxyClip?.thumbnail || seg.sourceClip.thumbnail,
       start: seg.start,
-      sourceStart: sourceStart
+      sourceStart: finalSourceStart
     };
   }, [timelineState.segments, timelineState.playheadSec]);
 
@@ -93,7 +95,7 @@ export default function EditorPage({
   }, [timelineState.playheadSec, timelineState.isDraggingPlayhead, effectiveSegment?.id, effectiveSegment?.start, effectiveSegment?.sourceStart]);
 
   const onExportClick = () => {
-    handleExport(timelineClipIds, true, defaultMergedName);
+    handleExport(timelineState.segments, true, defaultMergedName);
   };
 
   const playheadRef = useRef(timelineState.playheadSec);

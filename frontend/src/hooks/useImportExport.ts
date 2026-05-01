@@ -215,11 +215,32 @@ export default function useImportExport(props: ImportExportProps) {
     }
   }, [props.abortedRef, props.setProgress, props.setProgressMsg, props.setSelectedClips, props.setFocusedClip, props.setVideoIsHEVC, props.episodesPath, props.selectedFolderId, props.setEpisodes, props.setSelectedEpisodeId, props.setOpenedEpisodeId, props.setImportedVideoPath, props.setClips]);
 
-  const handleExport = useCallback(async (selectedClips: Set<string>, mergeEnabled: boolean, mergeFileName?: string) => {
-    if (selectedClips.size === 0) return;
+  const handleExport = useCallback(async (
+    input: Set<string> | any[], // any[] to avoid strict TimelineSegment circular dependency if needed, but we'll use property check
+    mergeEnabled: boolean, 
+    mergeFileName?: string
+  ) => {
+    let segmentsToExport: any[] = [];
 
-    const selected = props.clips.filter((c: ClipItem) => selectedClips.has(c.id));
-    if (selected.length === 0) return;
+    if (input instanceof Set) {
+      // Selector Mode: Each selected clip is a segment
+      const selected = props.clips.filter((c: ClipItem) => input.has(c.id));
+      if (selected.length === 0) return;
+      segmentsToExport = selected.map(c => ({
+        source_path: c.src,
+        source_start: c.start,
+        duration: c.end - c.start
+      }));
+    } else if (Array.isArray(input)) {
+      // Editor Mode: Use timeline segments
+      segmentsToExport = input.map(s => ({
+        source_path: s.sourceClip?.src || "",
+        source_start: s.sourceStart ?? 0,
+        duration: s.end - s.start
+      }));
+    }
+
+    if (segmentsToExport.length === 0) return;
 
     // If no export directory is set, prompt the user to pick one first
     let dir = props.exportDir;
@@ -234,12 +255,11 @@ export default function useImportExport(props: ImportExportProps) {
       setLoading(true);
 
       const sep = dir.includes('\\') ? '\\' : '/';
-      const clipArray = selected.map((c: ClipItem) => c.src);
       const format = props.exportFormat || "mp4";
 
       props.onRPCUpdate?.({
         type: "update",
-        details: `Exporting ${selected.length} clips`,
+        details: `Exporting ${segmentsToExport.length} segments`,
         state: "Saving Progress",
         large_image: "amverge_logo",
         small_image: props.generalSettings.rpcShowMiniIcons ? "save_icon_new" : undefined,
@@ -248,23 +268,19 @@ export default function useImportExport(props: ImportExportProps) {
       });
 
       if (mergeEnabled) {
-        const baseName = mergeFileName || ((selected[0]?.originalName || "episode") + "_merged");
+        const baseName = mergeFileName || "merged_video";
         const savePath = `${dir}${sep}${baseName}.${format}`;
 
         await invoke("export_clips", {
-          clips: clipArray,
+          segments: segmentsToExport,
           savePath: savePath,
           mergeEnabled: mergeEnabled,
         });
       } else {
-        const firstClipPath = selected[0]?.src || "";
-        const firstFile = firstClipPath.split(/[/\\]/).pop() || `episode_0000.${format}`;
-        const firstStem = firstFile.replace(/\.[^/.]+$/, "");
-        const defaultBase = firstStem.replace(/_\d{4}$/, "");
-        const savePath = `${dir}${sep}${defaultBase}_####.${format}`;
+        const savePath = `${dir}${sep}export_####.${format}`;
 
         await invoke("export_clips", {
-          clips: clipArray,
+          segments: segmentsToExport,
           savePath: savePath,
           mergeEnabled: false,
         });
