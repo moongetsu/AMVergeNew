@@ -270,7 +270,11 @@ def _run_ffmpeg_segment_chunk(
     cmd.extend([
         "-i", video_path,
         "-map", "0:v:0",
+<<<<<<< HEAD
         "-map", "0:a:0?",
+=======
+        "-map", "0:a?",
+>>>>>>> add76f402ff076ea48ab859ec2a40cea249b90d2
         "-c:v", "copy",
         "-c:a", "aac",
         "-b:a", "160k",
